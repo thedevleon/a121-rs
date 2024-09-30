@@ -12,12 +12,12 @@ use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    embassy::{self},
-    gpio::{self, IO},
+    gpio::{Input, Io, Level, Output, Pull, NO_PIN},
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
-    timer::TimerGroup,
+    system::SystemControl,
+    timer::timg::TimerGroup,
 };
 mod mulsc3;
 mod spi_adapter;
@@ -39,16 +39,16 @@ fn init_heap() {
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     init_heap();
     let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let system = SystemControl::new(peripherals.SYSTEM);
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timg0);
+    esp_hal_embassy::init(&clocks, timg0.timer0);
+
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // setup logger
     // To change the log_level change the env section in .cargo/config.toml
@@ -58,43 +58,22 @@ async fn main(_spawner: Spawner) {
 
     log::info!("A121 library version: {}", a121_rs::radar::rss_version());
 
-    // XE121
-    /*
-       #define GPIO_SEL0 4
-       #define GPIO_SEL1 3
-       #define GPIO_SEL2 2
-       #define GPIO_ENABLE 0
+    let radar_en = Output::new(io.pins.gpio22, Level::Low);
+    let radar_int = Input::new(io.pins.gpio23, Pull::Down);
 
-       #define GPIO_INTERRUPT 23
-       #define GPIO_SCLK 19
-       #define GPIO_MOSI 21
-       #define GPIO_MISO 20
-       #define GPIO_CS   22
-    */
+    let sclk = io.pins.gpio18;
+    let miso = io.pins.gpio10;
+    let mosi = io.pins.gpio5;
+    let cs = io.pins.gpio2;
 
-    // this is only required for the XE121
-    let mut sel0 = io.pins.gpio4.into_push_pull_output();
-    let mut sel1 = io.pins.gpio3.into_push_pull_output();
-    let mut sel2 = io.pins.gpio2.into_push_pull_output();
-    sel0.set_low().unwrap();
-    sel1.set_low().unwrap();
-    sel2.set_low().unwrap();
+    let cs = Output::new(cs, Level::High);
 
-    let radar_en = io.pins.gpio0.into_push_pull_output();
-    let radar_int = io.pins.gpio23.into_pull_down_input();
+    let spi_bus = Spi::new(peripherals.SPI2, 1u32.MHz(), SpiMode::Mode0, &clocks).with_pins(Some(sclk), Some(mosi), Some(miso), NO_PIN);
+    let spi_device = ExclusiveDevice::new(spi_bus, cs, Delay).expect("SPI device initialize error");
+    let spi_adater = spi_adapter::SpiAdapter::new(spi_device);
+    let spi_adapter = static_cell::make_static!(spi_adater);
 
-    let sclk = io.pins.gpio19;
-    let miso = io.pins.gpio20;
-    let mosi = io.pins.gpio21;
-    let cs = io.pins.gpio22;
-
-    let spi_bus = Spi::new(peripherals.SPI2, 1u32.MHz(), SpiMode::Mode0, &clocks);
-    let spi_bus = spi_bus.with_pins(Some(sclk), Some(mosi), Some(miso), gpio::NO_PIN);
-    let spi_device = ExclusiveDevice::new_no_delay(spi_bus, cs.into_push_pull_output());
-    let spi_device = spi_adapter::SpiAdapter::new(spi_device);
-    let spi_device = static_cell::make_static!(spi_device);
-
-    let mut radar = Radar::new(1, spi_device, radar_int, radar_en, Delay).await;
+    let mut radar = Radar::new(1, spi_adapter, radar_int, radar_en, Delay).await;
 
     log::info!("Radar enabled.");
     log::info!("Starting calibration...");
