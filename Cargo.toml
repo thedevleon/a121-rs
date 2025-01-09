@@ -13,9 +13,11 @@ version = "0.1.4"
 rust-version = "1.80"
 
 [dependencies]
-a121-sys = { version = "0.4", features = ["distance", "presence"] }
+a121-sys = { path = "../a121-sys", features = ["distance", "presence"] }
 
 defmt = { version = "0.3", optional = true }
+# TODO REMOVE ME
+log = { version = "0.4" }
 
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"

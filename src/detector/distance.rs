@@ -40,27 +40,27 @@ impl Drop for InnerRadarDistanceDetector {
 }
 
 /// The main structure representing the radar distance detector.
-pub struct RadarDistanceDetector<'radar, SINT, ENABLE, DLY>
+pub struct RadarDistanceDetector<'radar, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
     /// Reference to the radar system, configured and ready for operation.
-    pub radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>,
+    pub radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>,
     inner: InnerRadarDistanceDetector,
     /// Configuration for the radar distance detection.
     pub config: RadarDistanceConfig,
 }
 
-impl<'radar, SINT, ENABLE, DLY> RadarDistanceDetector<'radar, SINT, ENABLE, DLY>
+impl<'radar, SINT, ENABLE, DLY, SPI> RadarDistanceDetector<'radar, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
     /// Constructs a new radar distance detector with default configuration.
-    pub fn new(radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>) -> Self {
+    pub fn new(radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>) -> Self {
         let config = RadarDistanceConfig::default();
         let inner = InnerRadarDistanceDetector::new(&config);
         #[cfg(feature = "defmt")]
@@ -74,7 +74,7 @@ where
 
     /// Constructs a new radar distance detector with the provided configuration.
     pub fn with_config(
-        radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>,
+        radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>,
         config: RadarDistanceConfig,
     ) -> Self {
         let inner = InnerRadarDistanceDetector::new(&config);

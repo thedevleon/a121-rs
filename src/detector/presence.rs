@@ -47,24 +47,24 @@ impl Drop for InnerPresenceDetector {
     }
 }
 
-pub struct PresenceDetector<'radar, SINT, ENABLE, DLY>
+pub struct PresenceDetector<'radar, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
-    pub radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>,
+    pub radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>,
     inner: InnerPresenceDetector,
     pub config: PresenceConfig,
 }
 
-impl<'radar, SINT, ENABLE, DLY> PresenceDetector<'radar, SINT, ENABLE, DLY>
+impl<'radar, SINT, ENABLE, DLY, SPI> PresenceDetector<'radar, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
-    pub fn new(radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>) -> Self {
+    pub fn new(radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>) -> Self {
         let config = PresenceConfig::default();
         let inner = InnerPresenceDetector::new(&config);
         Self {
@@ -75,7 +75,7 @@ where
     }
 
     pub fn with_config(
-        radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY>,
+        radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>,
         config: PresenceConfig,
     ) -> Self {
         let inner = InnerPresenceDetector::new(&config);

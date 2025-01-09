@@ -1,17 +1,16 @@
-use core::cell::RefCell;
 use core::ffi::{c_char, c_void};
+use core::marker::PhantomData;
 
 #[cfg(feature = "defmt")]
 use core::ffi::CStr;
+use core::mem::MaybeUninit;
 
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::blocking_mutex::Mutex;
-use embedded_hal::spi::{ErrorKind as SpiErrorKind, SpiDevice};
+// TODO remove this
+use log::info;
+
+use embedded_hal::spi::SpiDevice;
 
 use a121_sys::{acc_hal_a121_t, acc_hal_optimization_t, acc_rss_hal_register, acc_sensor_id_t};
-
-pub type RadarSpi = dyn SpiDevice<u8, Error = SpiErrorKind> + Send;
-pub type RefRadarSpi = &'static mut RadarSpi;
 
 /// Global instance of a Mutex, wrapping a RefCell that optionally contains a mutable reference to a `SpiBus`.
 ///
@@ -25,18 +24,18 @@ pub type RefRadarSpi = &'static mut RadarSpi;
 /// The access to the `SPI_INSTANCE` is controlled via a mutex to prevent concurrent access issues.
 /// However, care must be taken to ensure that the SPI device is properly initialized before use
 /// and is not accessed after it has been freed or gone out of scope.
-static SPI_INSTANCE: Mutex<CriticalSectionRawMutex, RefCell<Option<RefRadarSpi>>> =
-    Mutex::new(RefCell::new(None));
+static mut SPI_INSTANCE: MaybeUninit<*mut c_void> = MaybeUninit::uninit();
 
 /// Represents the hardware abstraction layer implementation for the radar sensor.
 ///
 /// This struct encapsulates the necessary functionality to interface with the radar sensor
 /// using the SPI communication protocol and provides methods for memory management and logging.
-pub struct AccHalImpl {
+pub struct AccHalImpl<SPI> {
     inner: acc_hal_a121_t,
+    _spi: PhantomData<SPI>
 }
 
-impl AccHalImpl {
+impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
     /// Constructs a new `AccHalImpl` instance, registering the SPI device and initializing
     /// the radar hardware abstraction layer.
     ///
@@ -47,9 +46,7 @@ impl AccHalImpl {
     /// # Panics
     ///
     /// Panics if the HAL registration fails.
-    pub fn new<SPI>(spi: &'static mut SPI) -> Self
-    where
-        SPI: SpiDevice<u8, Error = SpiErrorKind> + Send + 'static,
+    pub fn new(spi: &'static mut SPI) -> Self
     {
         let inner = acc_hal_a121_t {
             max_spi_transfer_size: u16::MAX,
@@ -62,8 +59,14 @@ impl AccHalImpl {
             log: Some(a121_sys::c_log_stub),
             optimization: acc_hal_optimization_t { transfer16: None },
         };
-        SPI_INSTANCE.lock(|cell| cell.replace(Some(spi)));
-        Self { inner }
+
+        // info!("Address at new: {:?}", spi as *mut SPI as *mut c_void);
+
+        unsafe {
+            SPI_INSTANCE.write(spi as *mut SPI as *mut c_void);  
+        }
+  
+        Self { inner, _spi: PhantomData::default() }
     }
 
     /// Transfer function for 16-bit data used by the radar SDK.
@@ -89,13 +92,7 @@ impl AccHalImpl {
                 _buffer_length
             );
         }
-        // Borrow a mutable reference to the SpiBus
-        SPI_INSTANCE.lock(|cell| unsafe {
-            let mut binding = cell.borrow_mut();
-            let _spi = binding.as_mut().unwrap_unchecked();
-            // Perform the SPI transfer
-            todo!("Perform the SPI 16 transfer");
-        });
+        todo!("Perform the SPI 16 transfer");
     }
 
     extern "C" fn transfer8_function(
@@ -104,13 +101,11 @@ impl AccHalImpl {
         buffer_length: usize,
     ) {
         let tmp_buf = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_length) };
-        // Borrow a mutable reference to the SpiBus
-        SPI_INSTANCE.lock(|cell| unsafe {
-            let mut binding = cell.borrow_mut();
-            let spi = binding.as_mut().unwrap_unchecked();
-            // Perform the SPI transfer
-            spi.transfer_in_place(tmp_buf).unwrap_unchecked();
-        });
+        let spi = unsafe { &mut *((*SPI_INSTANCE.as_mut_ptr()) as *mut SPI)};
+        unsafe {
+            info!("Address at test: {:?}", spi as *mut SPI as *mut c_void);
+            spi.transfer_in_place(tmp_buf).unwrap();
+        }
     }
 
     /// Registers the HAL implementation with the radar SDK.

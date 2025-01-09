@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 
 use a121_sys::{acc_sensor_connected, acc_sensor_id_t, acc_sensor_t, acc_version_get_hex};
 use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::{ErrorKind as SpiErrorKind, SpiDevice};
+use embedded_hal::spi::SpiDevice;
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::digital::Wait;
 
@@ -14,8 +14,8 @@ use crate::sensor::calibration::CalibrationResult;
 use crate::sensor::error::SensorError;
 use crate::sensor::Sensor;
 
-pub type TransitionResult<STATEOK, STATERR, SINT, ENABLE, DLY> =
-    Result<Radar<STATEOK, SINT, ENABLE, DLY>, TransitionError<STATERR, SINT, ENABLE, DLY>>;
+pub type TransitionResult<STATEOK, STATERR, SINT, ENABLE, DLY, SPI> =
+    Result<Radar<STATEOK, SINT, ENABLE, DLY, SPI>, TransitionError<STATERR, SINT, ENABLE, DLY, SPI>>;
 
 pub struct Enabled;
 pub struct Ready;
@@ -28,18 +28,18 @@ impl RadarState for Ready {}
 impl RadarState for Hibernating {}
 
 /// Error type for transitioning between radar states
-pub struct TransitionError<STATE, SINT, ENABLE, DLY>
+pub struct TransitionError<STATE, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     STATE: RadarState,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
-    pub radar: Radar<STATE, SINT, ENABLE, DLY>,
+    pub radar: Radar<STATE, SINT, ENABLE, DLY, SPI>,
     error: SensorError,
 }
 
-impl<STATE, SINT, ENABLE, DLY> Debug for TransitionError<STATE, SINT, ENABLE, DLY>
+impl<STATE, SINT, ENABLE, DLY, SPI> Debug for TransitionError<STATE, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     STATE: RadarState,
@@ -51,19 +51,19 @@ where
     }
 }
 
-impl<STATE, SINT, ENABLE, DLY> From<TransitionError<STATE, SINT, ENABLE, DLY>> for SensorError
+impl<STATE, SINT, ENABLE, DLY, SPI> From<TransitionError<STATE, SINT, ENABLE, DLY, SPI>> for SensorError
 where
     SINT: Wait,
     STATE: RadarState,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
-    fn from(e: TransitionError<STATE, SINT, ENABLE, DLY>) -> Self {
+    fn from(e: TransitionError<STATE, SINT, ENABLE, DLY, SPI>) -> Self {
         e.error
     }
 }
 
-pub struct Radar<STATE, SINT, ENABLE, DLY>
+pub struct Radar<STATE, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     STATE: RadarState,
@@ -75,7 +75,7 @@ where
     sensor: Sensor<ENABLE, DLY>,
     pub processing: Processing,
     pub(crate) interrupt: SINT,
-    _hal: AccHalImpl,
+    _hal: AccHalImpl<SPI>,
     _state: PhantomData<STATE>,
 }
 
@@ -117,21 +117,20 @@ impl RssVersion {
     }
 }
 
-impl<SINT, ENABLE, DLY> Radar<Enabled, SINT, ENABLE, DLY>
+impl<SINT, ENABLE, DLY, SPI> Radar<Enabled, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
+    SPI: SpiDevice + Send + 'static
 {
-    pub async fn new<SPI>(
+    pub async fn new(
         id: u32,
         spi: &'static mut SPI,
         interrupt: SINT,
         mut enable_pin: ENABLE,
         mut delay: DLY,
-    ) -> Radar<Enabled, SINT, ENABLE, DLY>
-    where
-        SPI: SpiDevice<u8, Error = SpiErrorKind> + Send + 'static,
+    ) -> Radar<Enabled, SINT, ENABLE, DLY, SPI>
     {
         enable_pin.set_high().unwrap();
         delay.delay_ms(2).await;
@@ -154,7 +153,7 @@ where
     pub fn prepare_sensor(
         mut self,
         calibration_result: &mut CalibrationResult,
-    ) -> TransitionResult<Ready, Enabled, SINT, ENABLE, DLY> {
+    ) -> TransitionResult<Ready, Enabled, SINT, ENABLE, DLY, SPI> {
         let mut buf = [0u8; 2560];
         if self
             .sensor
@@ -179,13 +178,13 @@ where
     }
 }
 
-impl<SINT, ENABLE, DLY> Radar<Hibernating, SINT, ENABLE, DLY>
+impl<SINT, ENABLE, DLY, SPI> Radar<Hibernating, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
-    pub fn hibernate_off(self) -> TransitionResult<Ready, Hibernating, SINT, ENABLE, DLY> {
+    pub fn hibernate_off(self) -> TransitionResult<Ready, Hibernating, SINT, ENABLE, DLY, SPI> {
         if self.sensor.hibernate_off().is_ok() {
             Ok(Radar {
                 id: self.id,
@@ -205,7 +204,7 @@ where
     }
 }
 
-impl<SINT, ENABLE, DLY> Radar<Ready, SINT, ENABLE, DLY>
+impl<SINT, ENABLE, DLY, SPI> Radar<Ready, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     ENABLE: OutputPin,
@@ -223,7 +222,7 @@ where
         }
     }
 
-    pub fn hibernate_on(mut self) -> TransitionResult<Hibernating, Ready, SINT, ENABLE, DLY> {
+    pub fn hibernate_on(mut self) -> TransitionResult<Hibernating, Ready, SINT, ENABLE, DLY, SPI> {
         if self.sensor.hibernate_on().is_ok() {
             Ok(Radar {
                 id: self.id,
@@ -243,7 +242,7 @@ where
     }
 }
 
-impl<STATE, SINT, ENABLE, DLY> Radar<STATE, SINT, ENABLE, DLY>
+impl<STATE, SINT, ENABLE, DLY, SPI> Radar<STATE, SINT, ENABLE, DLY, SPI>
 where
     SINT: Wait,
     STATE: RadarState,
