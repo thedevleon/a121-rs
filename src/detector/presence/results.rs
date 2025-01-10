@@ -6,7 +6,9 @@ use a121_sys::{
 };
 
 /// Represents the results from a presence detection operation.
+/// TODO: maybe we want to include the ProcessingMetaData here too?
 pub struct PresenceResult<'r> {
+    pub processing_result: ProcessingResult,
     pub presence_detected: bool,
     pub intra_presence_score: f32,
     pub inter_presence_score: f32,
@@ -14,13 +16,19 @@ pub struct PresenceResult<'r> {
     pub depthwise_intra_presence_scores: &'r [f32],
     pub depthwise_inter_presence_scores: &'r [f32],
     pub depthwise_presence_scores_length: u32,
-    pub processing_result: ProcessingResult,
+    pub calibration_needed: bool,
+    pub data_saturated: bool,
+    pub frame_delayed: bool,
+    pub temperature: i16,
 }
 
 impl PresenceResult<'_> {
     /// Updates the presence result with data from the detector.
     /// This function should be called after `acc_detector_presence_process`.
     pub fn update_from_detector_result(&mut self, result: acc_detector_presence_result_t) {
+        // Processing result is directly assigned for simplicity, might require processing based on use-case
+        self.processing_result = ProcessingResult::from(result.processing_result);
+
         self.presence_detected = result.presence_detected;
         self.intra_presence_score = result.intra_presence_score;
         self.inter_presence_score = result.inter_presence_score;
@@ -42,8 +50,10 @@ impl PresenceResult<'_> {
             )
         };
 
-        // Processing result is directly assigned for simplicity, might require processing based on use-case
-        self.processing_result = ProcessingResult::from(result.processing_result);
+        self.calibration_needed = self.processing_result.inner.calibration_needed;
+        self.data_saturated = self.processing_result.inner.data_saturated;
+        self.frame_delayed = self.processing_result.inner.frame_delayed;
+        self.temperature = self.processing_result.inner.temperature;
     }
 
     pub(super) fn inner(&mut self) -> acc_detector_presence_result_t {
@@ -66,6 +76,7 @@ impl PresenceResult<'_> {
 impl Default for PresenceResult<'_> {
     fn default() -> Self {
         Self {
+            processing_result: ProcessingResult::default(),
             presence_detected: false,
             intra_presence_score: 0.0,
             inter_presence_score: 0.0,
@@ -73,7 +84,10 @@ impl Default for PresenceResult<'_> {
             depthwise_intra_presence_scores: &[],
             depthwise_inter_presence_scores: &[],
             depthwise_presence_scores_length: 0,
-            processing_result: ProcessingResult::default(),
+            calibration_needed: false,
+            data_saturated: false,
+            frame_delayed: false,
+            temperature: 0,
         }
     }
 }

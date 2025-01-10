@@ -13,7 +13,7 @@ pub mod metadata;
 
 #[derive(Debug, Clone)]
 pub struct ProcessingResult {
-    inner: acc_processing_result_t,
+    pub inner: acc_processing_result_t,
     pub frame: AccComplex,
 }
 
