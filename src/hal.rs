@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "defmt")]
 use core::ffi::CStr;
-use core::mem::MaybeUninit;
+use core::sync::atomic::AtomicPtr;
 
 // TODO remove this
 use log::info;
@@ -12,19 +12,10 @@ use embedded_hal::spi::SpiDevice;
 
 use a121_sys::{acc_hal_a121_t, acc_hal_optimization_t, acc_rss_hal_register, acc_sensor_id_t};
 
-/// Global instance of a Mutex, wrapping a RefCell that optionally contains a mutable reference to a `SpiBus`.
+/// Pointer to a 'static instance implementing SPI with types removed
 ///
-/// `SPI_INSTANCE` is used to store and provide controlled access to the SPI device required by the radar sensor.
-/// The `Mutex` ensures thread-safe access in environments where multi-threading is possible, while the `RefCell`
-/// allows for mutable access to the SPI device. This setup is crucial for enabling SPI communications in a safe
-/// and controlled manner within the radar sensor's hardware abstraction layer.
-///
-/// # Safety
-///
-/// The access to the `SPI_INSTANCE` is controlled via a mutex to prevent concurrent access issues.
-/// However, care must be taken to ensure that the SPI device is properly initialized before use
-/// and is not accessed after it has been freed or gone out of scope.
-static mut SPI_INSTANCE: MaybeUninit<*mut c_void> = MaybeUninit::uninit();
+/// This will be used by the hal callbacks for i2c communication
+static SPI_INSTANCE: AtomicPtr<c_void> = AtomicPtr::new(0 as *mut c_void);
 
 /// Represents the hardware abstraction layer implementation for the radar sensor.
 ///
@@ -32,7 +23,7 @@ static mut SPI_INSTANCE: MaybeUninit<*mut c_void> = MaybeUninit::uninit();
 /// using the SPI communication protocol and provides methods for memory management and logging.
 pub struct AccHalImpl<SPI> {
     inner: acc_hal_a121_t,
-    _spi: PhantomData<SPI>
+    _spi: PhantomData<SPI>,
 }
 
 impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
@@ -46,8 +37,7 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
     /// # Panics
     ///
     /// Panics if the HAL registration fails.
-    pub fn new(spi: &'static mut SPI) -> Self
-    {
+    pub fn new(spi: &'static mut SPI) -> Self {
         let inner = acc_hal_a121_t {
             max_spi_transfer_size: u16::MAX,
             mem_alloc: Some(mem_alloc),
@@ -62,11 +52,15 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
 
         // info!("Address at new: {:?}", spi as *mut SPI as *mut c_void);
 
-        unsafe {
-            SPI_INSTANCE.write(spi as *mut SPI as *mut c_void);  
+        SPI_INSTANCE.store(
+            spi as *mut SPI as *mut c_void,
+            core::sync::atomic::Ordering::Relaxed,
+        );
+
+        Self {
+            inner,
+            _spi: PhantomData::default(),
         }
-  
-        Self { inner, _spi: PhantomData::default() }
     }
 
     /// Transfer function for 16-bit data used by the radar SDK.
@@ -101,7 +95,8 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
         buffer_length: usize,
     ) {
         let tmp_buf = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_length) };
-        let spi = unsafe { &mut *((*SPI_INSTANCE.as_mut_ptr()) as *mut SPI)};
+        let spi =
+            unsafe { &mut *(SPI_INSTANCE.load(std::sync::atomic::Ordering::Relaxed) as *mut SPI) };
         unsafe {
             info!("Address at test: {:?}", spi as *mut SPI as *mut c_void);
             spi.transfer_in_place(tmp_buf).unwrap();

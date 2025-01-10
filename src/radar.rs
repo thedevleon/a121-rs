@@ -14,8 +14,10 @@ use crate::sensor::calibration::CalibrationResult;
 use crate::sensor::error::SensorError;
 use crate::sensor::Sensor;
 
-pub type TransitionResult<STATEOK, STATERR, SINT, ENABLE, DLY, SPI> =
-    Result<Radar<STATEOK, SINT, ENABLE, DLY, SPI>, TransitionError<STATERR, SINT, ENABLE, DLY, SPI>>;
+pub type TransitionResult<STATEOK, STATERR, SINT, ENABLE, DLY, SPI> = Result<
+    Radar<STATEOK, SINT, ENABLE, DLY, SPI>,
+    TransitionError<STATERR, SINT, ENABLE, DLY, SPI>,
+>;
 
 pub struct Enabled;
 pub struct Ready;
@@ -51,7 +53,8 @@ where
     }
 }
 
-impl<STATE, SINT, ENABLE, DLY, SPI> From<TransitionError<STATE, SINT, ENABLE, DLY, SPI>> for SensorError
+impl<STATE, SINT, ENABLE, DLY, SPI> From<TransitionError<STATE, SINT, ENABLE, DLY, SPI>>
+    for SensorError
 where
     SINT: Wait,
     STATE: RadarState,
@@ -122,7 +125,7 @@ where
     SINT: Wait,
     ENABLE: OutputPin,
     DLY: DelayNs,
-    SPI: SpiDevice + Send + 'static
+    SPI: SpiDevice + Send + 'static,
 {
     pub async fn new(
         id: u32,
@@ -130,8 +133,7 @@ where
         interrupt: SINT,
         mut enable_pin: ENABLE,
         mut delay: DLY,
-    ) -> Radar<Enabled, SINT, ENABLE, DLY, SPI>
-    {
+    ) -> Radar<Enabled, SINT, ENABLE, DLY, SPI> {
         enable_pin.set_high().unwrap();
         delay.delay_ms(2).await;
         let hal = AccHalImpl::new(spi);
