@@ -87,6 +87,13 @@ where
         }
     }
 
+    // /// Print out the complete configuration.
+    // pub fn log_config(&mut self) {
+    //     unsafe {
+    //         acc_detector_distance_config_log(self.inner, self.config.inner);
+    //     }
+    // }
+
     /// Performs calibration of the radar distance detector.
     pub async fn calibrate_detector(
         &mut self,

@@ -20,7 +20,7 @@ pub struct PresenceResult<'r> {
 impl PresenceResult<'_> {
     /// Updates the presence result with data from the detector.
     /// This function should be called after `acc_detector_presence_process`.
-    pub fn update_from_detector_result(&mut self, result: &acc_detector_presence_result_t) {
+    pub fn update_from_detector_result(&mut self, result: acc_detector_presence_result_t) {
         self.presence_detected = result.presence_detected;
         self.intra_presence_score = result.intra_presence_score;
         self.inter_presence_score = result.inter_presence_score;

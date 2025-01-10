@@ -64,6 +64,7 @@ where
     ENABLE: OutputPin,
     DLY: DelayNs,
 {
+    /// Constructs a new radar distance detector with default configuration.
     pub fn new(radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>) -> Self {
         let config = PresenceConfig::default();
         let inner = InnerPresenceDetector::new(&config);
@@ -74,6 +75,7 @@ where
         }
     }
 
+    /// Constructs a new radar distance detector with the provided configuration.
     pub fn with_config(
         radar: &'radar mut Radar<Ready, SINT, ENABLE, DLY, SPI>,
         config: PresenceConfig,
@@ -127,21 +129,31 @@ where
         buffer_size as usize
     }
 
-    pub async fn detect_presence(
+    /// Performs a distance measurement operation asynchronously.
+    ///
+    /// This function initiates a measurement operation, returning the results asynchronously.
+    pub async fn measure(&mut self, data: &mut [u8]) -> Result<(), SensorError> {
+        self.radar.measure(data).await
+    }
+
+    pub fn process_data(
         &mut self,
         buffer: &mut [u8],
     ) -> Result<PresenceResult, ProcessDataError> {
-        let mut result = PresenceResult::default();
+        let mut presence_result = PresenceResult::default();
+        let mut presence_result_ptr: acc_detector_presence_result_t = presence_result.inner();
+
         let detection_success = unsafe {
             acc_detector_presence_process(
                 self.inner.inner_mut(),
                 buffer.as_mut_ptr() as *mut c_void,
-                &mut result.inner() as *mut acc_detector_presence_result_t,
+                &mut presence_result_ptr as *mut acc_detector_presence_result_t,
             )
         };
+        presence_result.update_from_detector_result(presence_result_ptr);
 
         if detection_success {
-            Ok(result)
+            Ok(presence_result)
         } else {
             Err(ProcessDataError::ProcessingFailed)
         }

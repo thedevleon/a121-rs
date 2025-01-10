@@ -8,6 +8,7 @@
 
 #![warn(missing_docs)]
 
+use crate::config::RadarIdleState;
 use crate::config::profile::RadarProfile;
 use a121_sys::*;
 use core::ops::RangeInclusive;
@@ -36,6 +37,11 @@ impl Default for PresenceConfig {
 }
 
 impl PresenceConfig {
+    /// Sets the sensor ID.
+    pub fn sensor_set(&mut self, sensor_id: u32) {
+        unsafe { acc_detector_presence_config_sensor_set(self.inner, sensor_id) }
+    }
+
     /// Sets the measurement range in meters.
     pub fn set_range(&mut self, range: RangeInclusive<f32>) {
         unsafe {
@@ -44,20 +50,104 @@ impl PresenceConfig {
         }
     }
 
-    /// Sets the step length based on profile or manually.
-    pub fn set_step_length(&mut self, step_length: Option<u16>) {
-        match step_length {
-            Some(length) => unsafe {
-                acc_detector_presence_config_step_length_set(self.inner, length);
-                acc_detector_presence_config_auto_step_length_set(self.inner, false);
-            },
-            None => unsafe { acc_detector_presence_config_auto_step_length_set(self.inner, true) },
-        }
+    /// Set automatic subsweeps
+    pub fn set_automatic_subsweeps(&mut self, enable: bool) {
+        unsafe { acc_detector_presence_config_automatic_subsweeps_set(self.inner, enable) }
     }
 
-    /// Sets the sensor ID.
-    pub fn sensor_set(&mut self, sensor_id: u32) {
-        unsafe { acc_detector_presence_config_sensor_set(self.inner, sensor_id) }
+    /// Set signal quality
+    pub fn set_signal_quality(&mut self, signal_quality: SignalQuality) {
+        unsafe { acc_detector_presence_config_signal_quality_set(self.inner, signal_quality) }
+    }
+
+    /// Sets the inter-frame idle state.
+    pub fn set_inter_frame_idle_state(&mut self, idle_state: RadarIdleState) {
+        unsafe { acc_detector_presence_config_inter_frame_idle_state_set(self.inner, idle_state as u32) }
+    }
+
+    /// Sets the number of sweeps per frame.
+    pub fn set_sweeps_per_frame(&mut self, sweeps: u16) {
+        unsafe { acc_detector_presence_config_sweeps_per_frame_set(self.inner, sweeps) }
+    }
+
+    /// Sets the frame rate.
+    pub fn set_frame_rate(&mut self, frame_rate: f32) {
+        unsafe { acc_detector_presence_config_frame_rate_set(self.inner, frame_rate) }
+    }
+
+    /// Sets whether the frame rate is application-driven.
+    pub fn set_frame_rate_app_driven(&mut self, app_driven: bool) {
+        unsafe { acc_detector_presence_config_frame_rate_app_driven_set(self.inner, app_driven) }
+    }
+
+    /// Sets whether to reset filters on prepare.
+    pub fn set_reset_filters_on_prepare(&mut self, reset: bool) {
+        unsafe { acc_detector_presence_config_reset_filters_on_prepare_set(self.inner, reset) }
+    }
+
+    /// Sets whether intra-detection is enabled.
+    pub fn set_intra_detection(&mut self, enabled: bool) {
+        unsafe { acc_detector_presence_config_intra_detection_set(self.inner, enabled) }
+    }
+
+    /// Sets the intra-detection threshold.
+    pub fn set_intra_detection_threshold(&mut self, threshold: f32) {
+        unsafe { acc_detector_presence_config_intra_detection_threshold_set(self.inner, threshold) }
+    }
+
+    /// Sets the intra-frame time constant.
+    pub fn set_intra_frame_time_const(&mut self, time_const: f32) {
+        unsafe { acc_detector_presence_config_intra_frame_time_const_set(self.inner, time_const) }
+    }
+
+    /// Sets the intra-output time constant.
+    pub fn set_intra_output_time_const(&mut self, time_const: f32) {
+        unsafe { acc_detector_presence_config_intra_output_time_const_set(self.inner, time_const) }
+    }
+
+    /// Sets whether inter-detection is enabled.
+    pub fn set_inter_detection(&mut self, enabled: bool) {
+        unsafe { acc_detector_presence_config_inter_detection_set(self.inner, enabled) }
+    }
+
+    /// Sets the inter-detection threshold.
+    pub fn set_inter_detection_threshold(&mut self, threshold: f32) {
+        unsafe { acc_detector_presence_config_inter_detection_threshold_set(self.inner, threshold) }
+    }
+
+    /// Sets the inter-frame deviation time constant.
+    pub fn set_inter_frame_deviation_time_const(&mut self, time_const: f32) {
+        unsafe { acc_detector_presence_config_inter_frame_deviation_time_const_set(self.inner, time_const) }
+    }
+
+    /// Sets the inter-frame fast cutoff.
+    pub fn set_inter_frame_fast_cutoff(&mut self, cutoff: f32) {
+        unsafe { acc_detector_presence_config_inter_frame_fast_cutoff_set(self.inner, cutoff) }
+    }
+
+    /// Sets the inter-frame slow cutoff.
+    pub fn set_inter_frame_slow_cutoff(&mut self, cutoff: f32) {
+        unsafe { acc_detector_presence_config_inter_frame_slow_cutoff_set(self.inner, cutoff) }
+    }
+
+    /// Sets the inter-output time constant.
+    pub fn set_inter_output_time_const(&mut self, time_const: f32) {
+        unsafe { acc_detector_presence_config_inter_output_time_const_set(self.inner, time_const) }
+    }
+
+    /// Sets the inter-frame presence timeout.
+    pub fn set_inter_frame_presence_timeout(&mut self, timeout: u16) {
+        unsafe { acc_detector_presence_config_inter_frame_presence_timeout_set(self.inner, timeout) }
+    }
+
+    /// Sets whether inter-phase boost is enabled.
+    pub fn set_inter_phase_boost(&mut self, enabled: bool) {
+        unsafe { acc_detector_presence_config_inter_phase_boost_set(self.inner, enabled) }
+    }
+
+    /// Set the auto step length
+    pub fn set_auto_step_length(&mut self, enable: bool) {
+        unsafe { acc_detector_presence_config_auto_step_length_set(self.inner, enable) }
     }
 
     /// Enables or disables automatic profile selection.
@@ -70,36 +160,13 @@ impl PresenceConfig {
         unsafe { acc_detector_presence_config_profile_set(self.inner, profile as u32) }
     }
 
-    /// Configures frame rate for presence detection.
-    pub fn frame_rate_set(&mut self, frame_rate: f32) {
-        unsafe { acc_detector_presence_config_frame_rate_set(self.inner, frame_rate) }
+    /// Set hwaas
+    pub fn set_hwaas(&mut self, hwaas: u16) {
+        unsafe { acc_detector_presence_config_hwaas_set(self.inner, hwaas) }
     }
 
-    /// Enables or disables filter reset on prepare.
-    pub fn reset_filters_on_prepare_set(&mut self, enable: bool) {
-        unsafe { acc_detector_presence_config_reset_filters_on_prepare_set(self.inner, enable) }
-    }
-
-    /// Configures detection thresholds for fast and slow movements.
-    pub fn detection_thresholds_set(&mut self, intra: f32, inter: f32) {
-        unsafe {
-            acc_detector_presence_config_intra_detection_threshold_set(self.inner, intra);
-            acc_detector_presence_config_inter_detection_threshold_set(self.inner, inter);
-        }
-    }
-
-    /// Enables or disables intra-frame and inter-frame detection.
-    pub fn detection_enable(&mut self, intra_enable: bool, inter_enable: bool) {
-        unsafe {
-            acc_detector_presence_config_intra_detection_set(self.inner, intra_enable);
-            acc_detector_presence_config_inter_detection_set(self.inner, inter_enable);
-        }
-    }
-
-    // log the config
+    /// Print out the complete configuration.
     pub fn log_config(&mut self) {
-        unsafe {
-            acc_detector_presence_config_log(self.inner);
-        }
+        unsafe { acc_detector_presence_config_log(self.inner); }
     }
 }
