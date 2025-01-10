@@ -60,7 +60,8 @@ feature | description
 distance | Enable distance measurement module
 presence | Enable presence detection module (coming soon)
 libm | Use libm crate for floating point operations
-nightly-logger | If the C wrapper for logging does not compile with stable rust, enable this feature to use nightly rust with a custom logger
+defmt | Use defmt for logging
+log | Use log for logging
 
 ## Examples
 

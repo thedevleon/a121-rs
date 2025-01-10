@@ -95,4 +95,11 @@ impl PresenceConfig {
             acc_detector_presence_config_inter_detection_set(self.inner, inter_enable);
         }
     }
+
+    // log the config
+    pub fn log_config(&mut self) {
+        unsafe {
+            acc_detector_presence_config_log(self.inner);
+        }
+    }
 }

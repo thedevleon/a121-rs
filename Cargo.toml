@@ -16,8 +16,7 @@ rust-version = "1.80"
 a121-sys = { path = "../a121-sys", features = ["distance", "presence"] }
 
 defmt = { version = "0.3", optional = true }
-# TODO REMOVE ME
-log = { version = "0.4" }
+log = { version = "0.4", optional = true}
 
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
@@ -34,9 +33,9 @@ cc = "1.0"
 distance = ["a121-sys/distance"]
 presence = ["a121-sys/presence"]
 libm = ["dep:libm", "num/libm"]
-nightly-logger = ["defmt"]
 std = []
 defmt = ["dep:defmt"]
+log = ["dep:log"]
 
 [profile.dev]
 lto = true

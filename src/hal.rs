@@ -1,18 +1,10 @@
-use core::ffi::{c_char, c_void};
-use core::marker::PhantomData;
-
-#[cfg(feature = "defmt")]
-use core::ffi::CStr;
+use core::ffi::{c_char, c_void, CStr};
 use core::mem::MaybeUninit;
-
-// TODO remove this
-use log::info;
-
+use core::marker::PhantomData;
 use embedded_hal::spi::SpiDevice;
-
 use a121_sys::{acc_hal_a121_t, acc_hal_optimization_t, acc_rss_hal_register, acc_sensor_id_t};
 
-/// Global instance of a Mutex, wrapping a RefCell that optionally contains a mutable reference to a `SpiBus`.
+/// Global instance of a Mutex, wrapping a raw C pointer contains a mutable reference to a `SpiBus`.
 ///
 /// `SPI_INSTANCE` is used to store and provide controlled access to the SPI device required by the radar sensor.
 /// The `Mutex` ensures thread-safe access in environments where multi-threading is possible, while the `RefCell`
@@ -53,14 +45,9 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
             mem_alloc: Some(mem_alloc),
             mem_free: Some(mem_free),
             transfer: Some(Self::transfer8_function),
-            #[cfg(feature = "nightly-logger")]
-            log: Some(logger),
-            #[cfg(not(feature = "nightly-logger"))]
-            log: Some(a121_sys::c_log_stub),
+            log: Some(a121_sys::c_log_stub), // TODO replace with logger once va are correctly parsed
             optimization: acc_hal_optimization_t { transfer16: None },
         };
-
-        // info!("Address at new: {:?}", spi as *mut SPI as *mut c_void);
 
         unsafe {
             SPI_INSTANCE.write(spi as *mut SPI as *mut c_void);  
@@ -102,10 +89,7 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
     ) {
         let tmp_buf = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_length) };
         let spi = unsafe { &mut *((*SPI_INSTANCE.as_mut_ptr()) as *mut SPI)};
-        unsafe {
-            info!("Address at test: {:?}", spi as *mut SPI as *mut c_void);
-            spi.transfer_in_place(tmp_buf).unwrap();
-        }
+        spi.transfer_in_place(tmp_buf).unwrap();
     }
 
     /// Registers the HAL implementation with the radar SDK.
@@ -148,31 +132,41 @@ unsafe extern "C" fn mem_free(ptr: *mut c_void) {
     free(ptr);
 }
 
-#[cfg(feature = "nightly-logger")]
-unsafe extern "C" fn logger(
-    level: a121_sys::acc_log_level_t,
-    module: *const c_char,
-    format: *const c_char,
-    mut _va: ...
-) {
-    let module = unsafe { CStr::from_ptr(module) };
-    let format = unsafe { CStr::from_ptr(format) };
-    let message = format.to_str().unwrap_or("");
+// unsafe extern "C" fn logger(
+//     level: a121_sys::acc_log_level_t,
+//     module: *const c_char,
+//     format: *const c_char,
+//     mut _va: ...
+// ) {
+//     let module = unsafe { CStr::from_ptr(module) };
+//     let format = unsafe { CStr::from_ptr(format) };
+//     let message = format.to_str().unwrap_or("");
 
-    match level {
-        0 => defmt::error!("{}: {}", module.to_str().unwrap_or(""), message),
-        1 => defmt::warn!("{}: {}", module.to_str().unwrap_or(""), message),
-        2 => defmt::info!("{}: {}", module.to_str().unwrap_or(""), message),
-        3 => defmt::debug!("{}: {}", module.to_str().unwrap_or(""), message),
-        4 => defmt::trace!("{}: {}", module.to_str().unwrap_or(""), message),
-        _ => defmt::error!("Unknown log level: {}", level),
-    }
-}
+//     // TODO parse _va to get the actual message
 
-#[cfg(not(feature = "nightly-logger"))]
-/// This function is called by the C stub to log messages from the SDK.
-/// # Safety
-/// This function is unsafe because it takes a raw pointer.
+//     #[cfg(feature = "defmt")]
+//     match level {
+//         0 => defmt::error!("{}: {}", module.to_str().unwrap_or(""), message),
+//         1 => defmt::warn!("{}: {}", module.to_str().unwrap_or(""), message),
+//         2 => defmt::info!("{}: {}", module.to_str().unwrap_or(""), message),
+//         3 => defmt::debug!("{}: {}", module.to_str().unwrap_or(""), message),
+//         4 => defmt::trace!("{}: {}", module.to_str().unwrap_or(""), message),
+//         _ => defmt::error!("Unknown log level: {}", level),
+//     }
+
+//     #[cfg(feature = "log")]
+//     match level {
+//         0 => log::error!("{}: {}", module.to_str().unwrap_or(""), message),
+//         1 => log::warn!("{}: {}", module.to_str().unwrap_or(""), message),
+//         2 => log::info!("{}: {}", module.to_str().unwrap_or(""), message),
+//         3 => log::debug!("{}: {}", module.to_str().unwrap_or(""), message),
+//         4 => log::trace!("{}: {}", module.to_str().unwrap_or(""), message),
+//         _ => log::error!("Unknown log level: {}", level),
+//     }
+// }
+
+// This is called by the c_log_stub function from a121-sys, to better parse the va_list
+// Ultimately, this function will be replaced by the logger function
 #[no_mangle]
 pub unsafe extern "C" fn rust_log(_level: u32, _message: *const c_char) {
     #[cfg(feature = "defmt")]
@@ -186,6 +180,20 @@ pub unsafe extern "C" fn rust_log(_level: u32, _message: *const c_char) {
             3 => defmt::debug!("{}", str_slice),
             4 => defmt::trace!("{}", str_slice),
             _ => defmt::error!("Unknown log level: {}", _level),
+        }
+    }
+
+    #[cfg(feature = "log")]
+    {
+        let c_str = unsafe { CStr::from_ptr(_message) };
+        let str_slice = c_str.to_str().unwrap_or("");
+        match _level {
+            0 => log::error!("{}", str_slice),
+            1 => log::warn!("{}", str_slice),
+            2 => log::info!("{}", str_slice),
+            3 => log::debug!("{}", str_slice),
+            4 => log::trace!("{}", str_slice),
+            _ => log::error!("Unknown log level: {}", _level),
         }
     }
 }
