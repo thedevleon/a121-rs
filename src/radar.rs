@@ -254,8 +254,8 @@ where
     }
 
     pub async fn calibrate(&mut self) -> Result<CalibrationResult, SensorError> {
-        let mut buf = [0u8; 5560];
-        self.sensor.calibrate(&mut self.interrupt, &mut buf).await
+        let mut buf = alloc::boxed::Box::new([0; 5560]);
+        self.sensor.calibrate(&mut self.interrupt, buf.as_mut_slice()).await
     }
 
     /// Turns the radar sensor off then on again.
