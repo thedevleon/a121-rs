@@ -49,6 +49,7 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
             optimization: acc_hal_optimization_t { transfer16: None },
         };
 
+        #[allow(static_mut_refs)]
         unsafe {
             SPI_INSTANCE.write(spi as *mut SPI as *mut c_void);  
         }
@@ -88,6 +89,7 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
         buffer_length: usize,
     ) {
         let tmp_buf = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_length) };
+        #[allow(static_mut_refs)]
         let spi = unsafe { &mut *((*SPI_INSTANCE.as_mut_ptr()) as *mut SPI)};
         spi.transfer_in_place(tmp_buf).unwrap();
     }

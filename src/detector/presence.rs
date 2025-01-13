@@ -4,7 +4,6 @@ pub mod results;
 use crate::detector::presence::config::PresenceConfig;
 use crate::detector::presence::results::{PresenceMetadata, PresenceResult, ProcessDataError};
 use crate::radar::{Radar, Ready};
-use crate::sensor::calibration::CalibrationResult;
 use crate::sensor::error::SensorError;
 use a121_sys::*;
 use core::ffi::c_void;
@@ -92,23 +91,20 @@ where
         self.inner.presence_metadata()
     }
 
-    pub async fn prepare_detector(
-        &mut self,
-        sensor_cal_result: &CalibrationResult,
-        buffer: &mut [u8],
-    ) -> Result<(), SensorError> {
+    /// Calibrates and prepares the radar sensor
+    pub async fn calibrate_and_prepare(&mut self, buffer: &mut [u8]) -> Result<(), SensorError> {
         let buffer_size = self.get_buffer_size();
-
         if buffer.len() < buffer_size {
             return Err(SensorError::BufferTooSmall);
         }
 
+        let result = self.radar.calibrate().await?;
         let prepare_success = unsafe {
             acc_detector_presence_prepare(
                 self.inner.inner_mut(),
                 self.config.inner,
                 self.radar.inner_sensor(),
-                sensor_cal_result.ptr(),
+                result.ptr(),
                 buffer.as_mut_ptr() as *mut c_void,
                 buffer.len() as u32,
             )
@@ -118,7 +114,7 @@ where
             Ok(())
         } else {
             Err(SensorError::PrepareFailed)
-        }
+        }  
     }
 
     pub fn get_buffer_size(&self) -> usize {
