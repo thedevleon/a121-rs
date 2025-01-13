@@ -1,22 +1,13 @@
 use core::ffi::{c_char, c_void, CStr};
-use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicPtr, Ordering};
 use core::marker::PhantomData;
 use embedded_hal::spi::SpiDevice;
 use a121_sys::{acc_hal_a121_t, acc_hal_optimization_t, acc_rss_hal_register, acc_sensor_id_t};
 
-/// Global instance of a Mutex, wrapping a raw C pointer contains a mutable reference to a `SpiBus`.
-///
-/// `SPI_INSTANCE` is used to store and provide controlled access to the SPI device required by the radar sensor.
-/// The `Mutex` ensures thread-safe access in environments where multi-threading is possible, while the `RefCell`
-/// allows for mutable access to the SPI device. This setup is crucial for enabling SPI communications in a safe
-/// and controlled manner within the radar sensor's hardware abstraction layer.
-///
-/// # Safety
-///
-/// The access to the `SPI_INSTANCE` is controlled via a mutex to prevent concurrent access issues.
-/// However, care must be taken to ensure that the SPI device is properly initialized before use
-/// and is not accessed after it has been freed or gone out of scope.
-static mut SPI_INSTANCE: MaybeUninit<*mut c_void> = MaybeUninit::uninit();
+/// Pointer to a 'static instance implementing SPI with types removed
+/// 
+/// This will be used by the hal callbacks for i2c communication
+static SPI_INSTANCE: AtomicPtr<c_void> = AtomicPtr::new(0 as *mut c_void);
 
 /// Represents the hardware abstraction layer implementation for the radar sensor.
 ///
@@ -49,11 +40,11 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
             optimization: acc_hal_optimization_t { transfer16: None },
         };
 
-        #[allow(static_mut_refs)]
-        unsafe {
-            SPI_INSTANCE.write(spi as *mut SPI as *mut c_void);  
-        }
-  
+        SPI_INSTANCE.store(
+            spi as *mut SPI as *mut c_void,
+            Ordering::Relaxed,
+        );
+
         Self { inner, _spi: PhantomData::default() }
     }
 
@@ -89,8 +80,7 @@ impl<SPI: SpiDevice + Send + 'static> AccHalImpl<SPI> {
         buffer_length: usize,
     ) {
         let tmp_buf = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_length) };
-        #[allow(static_mut_refs)]
-        let spi = unsafe { &mut *((*SPI_INSTANCE.as_mut_ptr()) as *mut SPI)};
+        let spi = unsafe { &mut *(SPI_INSTANCE.load(Ordering::Relaxed) as *mut SPI) };
         spi.transfer_in_place(tmp_buf).unwrap();
     }
 
