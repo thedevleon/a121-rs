@@ -8,8 +8,8 @@
 
 #![warn(missing_docs)]
 
-use crate::config::RadarIdleState;
 use crate::config::profile::RadarProfile;
+use crate::config::RadarIdleState;
 use a121_sys::*;
 use core::ops::RangeInclusive;
 
@@ -62,7 +62,9 @@ impl PresenceConfig {
 
     /// Sets the inter-frame idle state.
     pub fn set_inter_frame_idle_state(&mut self, idle_state: RadarIdleState) {
-        unsafe { acc_detector_presence_config_inter_frame_idle_state_set(self.inner, idle_state as u32) }
+        unsafe {
+            acc_detector_presence_config_inter_frame_idle_state_set(self.inner, idle_state as u32)
+        }
     }
 
     /// Sets the number of sweeps per frame.
@@ -117,7 +119,11 @@ impl PresenceConfig {
 
     /// Sets the inter-frame deviation time constant.
     pub fn set_inter_frame_deviation_time_const(&mut self, time_const: f32) {
-        unsafe { acc_detector_presence_config_inter_frame_deviation_time_const_set(self.inner, time_const) }
+        unsafe {
+            acc_detector_presence_config_inter_frame_deviation_time_const_set(
+                self.inner, time_const,
+            )
+        }
     }
 
     /// Sets the inter-frame fast cutoff.
@@ -137,7 +143,9 @@ impl PresenceConfig {
 
     /// Sets the inter-frame presence timeout.
     pub fn set_inter_frame_presence_timeout(&mut self, timeout: u16) {
-        unsafe { acc_detector_presence_config_inter_frame_presence_timeout_set(self.inner, timeout) }
+        unsafe {
+            acc_detector_presence_config_inter_frame_presence_timeout_set(self.inner, timeout)
+        }
     }
 
     /// Sets whether inter-phase boost is enabled.
@@ -151,7 +159,7 @@ impl PresenceConfig {
     }
 
     /// Enables or disables automatic profile selection.
-    pub fn auto_profile_set(&mut self, enable: bool) {
+    pub fn set_auto_profile(&mut self, enable: bool) {
         unsafe { acc_detector_presence_config_auto_profile_set(self.inner, enable) }
     }
 
@@ -167,6 +175,116 @@ impl PresenceConfig {
 
     /// Print out the complete configuration.
     pub fn log_config(&mut self) {
-        unsafe { acc_detector_presence_config_log(self.inner); }
+        unsafe {
+            acc_detector_presence_config_log(self.inner);
+        }
+    }
+
+    // Presets
+    /// Short Range Preset as found in C Sample (example_detector_presence.c)
+    pub fn preset_short_range(config: &mut PresenceConfig) {
+        config.set_range(0.06..=1.0);
+        config.set_automatic_subsweeps(true);
+        config.set_signal_quality(30.0);
+        config.set_inter_frame_idle_state(RadarIdleState::Ready);
+        config.set_sweeps_per_frame(16);
+
+        config.set_frame_rate(10.0);
+        config.set_frame_rate_app_driven(false);
+        config.set_reset_filters_on_prepare(true);
+
+        config.set_intra_detection(true);
+        config.set_intra_detection_threshold(1.4);
+        config.set_intra_frame_time_const(0.15);
+        config.set_intra_output_time_const(0.3);
+
+        config.set_inter_detection(true);
+        config.set_inter_detection_threshold(1.0);
+        config.set_inter_frame_deviation_time_const(0.5);
+        config.set_inter_frame_fast_cutoff(5.0);
+        config.set_inter_frame_slow_cutoff(0.2);
+        config.set_inter_output_time_const(2.0);
+        config.set_inter_frame_presence_timeout(3);
+        config.set_inter_phase_boost(false);
+    }
+
+    /// Medium Range Preset as found in C Sample (example_detector_presence.c)
+    pub fn preset_medium_range(config: &mut PresenceConfig) {
+        config.set_range(0.3..=2.5);
+        config.set_automatic_subsweeps(true);
+        config.set_signal_quality(30.0);
+        config.set_inter_frame_idle_state(RadarIdleState::Ready);
+        config.set_sweeps_per_frame(16);
+
+        config.set_frame_rate(10.0);
+        config.set_frame_rate_app_driven(false);
+        config.set_reset_filters_on_prepare(true);
+
+        config.set_intra_detection(true);
+        config.set_intra_detection_threshold(1.3);
+        config.set_intra_frame_time_const(0.15);
+        config.set_intra_output_time_const(0.3);
+
+        config.set_inter_detection(true);
+        config.set_inter_detection_threshold(1.0);
+        config.set_inter_frame_deviation_time_const(0.5);
+        config.set_inter_frame_fast_cutoff(6.0);
+        config.set_inter_frame_slow_cutoff(0.2);
+        config.set_inter_output_time_const(2.0);
+        config.set_inter_frame_presence_timeout(3);
+        config.set_inter_phase_boost(false);
+    }
+
+    /// Long Range Preset as found in C Sample (example_detector_presence.c)
+    pub fn preset_long_range(config: &mut PresenceConfig) {
+        config.set_range(5.0..=7.5);
+        config.set_automatic_subsweeps(true);
+        config.set_signal_quality(10.0);
+        config.set_inter_frame_idle_state(RadarIdleState::Ready);
+        config.set_sweeps_per_frame(16);
+
+        config.set_frame_rate(12.0);
+        config.set_frame_rate_app_driven(false);
+        config.set_reset_filters_on_prepare(true);
+
+        config.set_intra_detection(true);
+        config.set_intra_detection_threshold(1.2);
+        config.set_intra_frame_time_const(0.15);
+        config.set_intra_output_time_const(0.3);
+
+        config.set_inter_detection(true);
+        config.set_inter_detection_threshold(0.8);
+        config.set_inter_frame_deviation_time_const(0.5);
+        config.set_inter_frame_fast_cutoff(6.0);
+        config.set_inter_frame_slow_cutoff(0.2);
+        config.set_inter_output_time_const(2.0);
+        config.set_inter_frame_presence_timeout(3);
+        config.set_inter_phase_boost(false);
+    }
+
+    /// Preset for a ceiling mounted radar.
+    pub fn preset_ceiling(config: &mut PresenceConfig) {
+        config.set_range(4.0..=7.0);
+        config.set_auto_profile(true);
+        config.set_auto_step_length(true);
+        config.set_sweeps_per_frame(16);
+        config.set_hwaas(32);
+
+        config.set_frame_rate(5.0);
+        config.set_inter_frame_idle_state(RadarIdleState::Ready);
+
+        config.set_intra_detection(true);
+        config.set_intra_detection_threshold(0.13);
+        config.set_intra_frame_time_const(0.15);
+        config.set_intra_output_time_const(0.3);
+
+        config.set_inter_detection(true);
+        config.set_inter_detection_threshold(1.0);
+        config.set_inter_frame_fast_cutoff(6.0);
+        config.set_inter_frame_slow_cutoff(0.2);
+        config.set_inter_frame_deviation_time_const(0.5);
+        config.set_inter_output_time_const(2.0);
+        config.set_inter_phase_boost(true);
+        config.set_inter_frame_presence_timeout(10);
     }
 }
