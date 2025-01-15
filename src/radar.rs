@@ -132,6 +132,9 @@ where
         mut delay: DLY,
     ) -> Radar<Enabled, SINT, ENABLE, DLY, SPI>
     {
+        // Reset the radar first, to avoid an invalid state of the sensor after a crash
+        enable_pin.set_low().unwrap();
+        delay.delay_ms(2).await;
         enable_pin.set_high().unwrap();
         delay.delay_ms(2).await;
         let hal = AccHalImpl::new(spi);
