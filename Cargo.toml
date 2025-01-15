@@ -13,7 +13,7 @@ version = "0.1.4"
 rust-version = "1.80"
 
 [dependencies]
-a121-sys = { path = "../a121-sys", features = ["distance", "presence"] }
+a121-sys = { git = "https://github.com/thedevleon/a121-sys.git", branch = "feat/esp-idf-support", features = ["distance", "presence"] }
 
 defmt = { version = "0.3", optional = true }
 log = { version = "0.4", optional = true}
